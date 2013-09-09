@@ -137,7 +137,7 @@ module HandBrake
     #   automatically resumable batch scripts.
     #
     # @return [void]
-    def output(filename, options={})
+    def output(filename, options={}, &block)
       options = options.dup
       overwrite = options.delete :overwrite
       case overwrite
@@ -172,7 +172,7 @@ module HandBrake
       end
 
       FileUtils.mkdir_p(File.dirname(interim_filename), fileutils_options)
-      run('--output', interim_filename)
+      run('--output', interim_filename, &block)
 
       if filename != interim_filename
         replace =
@@ -276,14 +276,12 @@ module HandBrake
 
     private
 
-    def run(*more_args)
-      @runner.run(arguments.push(*more_args)).tap do |result|
-        unless result.status.to_i == 0
-          unless trace?
-            $stderr.write result.output
-          end
-          raise "HandBrakeCLI execution failed (#{result.status.inspect})"
-        end
+    def run(*more_args, &block)
+      result = @runner.run(arguments.push(*more_args), &block)
+
+      unless result.status.to_i == 0
+        $stderr.write(result.output) unless trace?
+        raise "HandBrakeCLI execution failed (#{result.status.inspect})"
       end
     end
 
@@ -336,6 +334,7 @@ module HandBrake
 
       ##
       # @param [Array<String>] arguments the arguments to pass to HandBrakeCLI
+      # @yield [String] Gives lines to the block
       # @return [RunnerResult]
       def run(arguments)
         output = ''
@@ -351,6 +350,7 @@ module HandBrake
             while line = io.read(60)
               output << line
               $stderr.write(line) if @cli.trace?
+              yield(line) if block_given?
             end
           end
           RunnerResult.new(output, $?)
