@@ -277,11 +277,13 @@ module HandBrake
     private
 
     def run(*more_args, &block)
-      result = @runner.run(arguments.push(*more_args), &block)
-
-      unless result.status.to_i == 0
-        $stderr.write(result.output) unless trace?
-        raise "HandBrakeCLI execution failed (#{result.status.inspect})"
+      @runner.run(arguments.push(*more_args), &block).tap do |result|
+        unless result.status.to_i == 0
+          unless trace?
+            $stderr.write result.output
+          end
+          raise "HandBrakeCLI execution failed (#{result.status.inspect})"
+        end
       end
     end
 
